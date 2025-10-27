@@ -207,7 +207,7 @@ app.post('/api/auth/register', async (req, res) => {
     console.log('User saved successfully');
 
     res.status(201).json({
-      message: 'User registered successfully',
+      message: user.role === 'admin' ? 'Admin registered successfully' : 'User registered successfully',
       user: {
         id: user._id,
         username: user.username,
