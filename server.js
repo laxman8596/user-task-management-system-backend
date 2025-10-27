@@ -8,7 +8,7 @@ import userRoutes from './routes/user.js';
 import taskRoutes from './routes/task.js';
 dotenv.config();
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 const app = express();
 
 app.use(express.json());
@@ -78,13 +78,32 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'API routes are working' });
 });
 
+// Health check route
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    port: PORT,
+    env: process.env.NODE_ENV,
+    mongoUri: process.env.MONGO_URI ? 'Set' : 'Not set'
+  });
+});
+
 // Inline auth routes for testing
 app.post('/api/auth/login', async (req, res) => {
   try {
+    console.log('Login attempt:', { email: req.body.email });
     const { email, password } = req.body;
     
     if (!email || !password) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+    
+    // Check database connection
+    const mongoose = await import('mongoose');
+    if (mongoose.default.connection.readyState !== 1) {
+      console.log('Database not connected, attempting to connect...');
+      await connectDB();
     }
     
     // Import User model dynamically
@@ -92,16 +111,19 @@ app.post('/api/auth/login', async (req, res) => {
     const bcrypt = await import('bcryptjs');
     const jwt = await import('jsonwebtoken');
     
+    console.log('Finding user...');
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ message: "User does not exist" });
     }
     
+    console.log('Comparing password...');
     const isMatch = await bcrypt.default.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
     
+    console.log('Generating tokens...');
     const accessToken = jwt.default.sign(
       { id: user._id, role: user.role },
       process.env.ACCESS_TOKEN_SECRET,
@@ -121,6 +143,7 @@ app.post('/api/auth/login', async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
     
+    console.log('Login successful');
     res.status(200).json({
       accessToken,
       user: {
@@ -132,28 +155,43 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ 
+      message: "Login failed", 
+      error: error.message 
+    });
   }
 });
 
 app.post('/api/auth/register', async (req, res) => {
   try {
+    console.log('Registration attempt:', req.body);
     const { username, email, password, role } = req.body;
     
     if (!username || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
     
+    // Check database connection
+    const mongoose = await import('mongoose');
+    if (mongoose.default.connection.readyState !== 1) {
+      console.log('Database not connected, attempting to connect...');
+      await connectDB();
+    }
+    
     // Import User model dynamically
     const { default: User } = await import('./models/user.js');
     const bcrypt = await import('bcryptjs');
     
+    console.log('Checking for existing user...');
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
     
+    console.log('Hashing password...');
     const hashedPassword = await bcrypt.default.hash(password, 10);
+    
+    console.log('Creating user...');
     const user = new User({
       username,
       email,
@@ -161,7 +199,9 @@ app.post('/api/auth/register', async (req, res) => {
       role: role || 'user'
     });
     
+    console.log('Saving user...');
     await user.save();
+    console.log('User saved successfully');
     
     res.status(201).json({
       message: 'User registered successfully',
@@ -174,7 +214,11 @@ app.post('/api/auth/register', async (req, res) => {
     });
   } catch (error) {
     console.error("Register error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ 
+      message: "Registration failed", 
+      error: error.message,
+      details: error.name 
+    });
   }
 });
 
