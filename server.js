@@ -24,6 +24,9 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Handle preflight requests
+app.options('*', cors());
+
 // Root route (no DB required)
 app.get('/', (req, res) => {
   res.json({ 
