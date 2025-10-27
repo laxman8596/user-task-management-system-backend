@@ -73,9 +73,121 @@ app.get('/db-status', async (req, res) => {
   }
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/tasks', taskRoutes);
+// Simple test route
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'API routes are working' });
+});
+
+// Inline auth routes for testing
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+    
+    // Import User model dynamically
+    const { default: User } = await import('./models/user.js');
+    const bcrypt = await import('bcryptjs');
+    const jwt = await import('jsonwebtoken');
+    
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: "User does not exist" });
+    }
+    
+    const isMatch = await bcrypt.default.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+    
+    const accessToken = jwt.default.sign(
+      { id: user._id, role: user.role },
+      process.env.ACCESS_TOKEN_SECRET,
+      { expiresIn: "7d" }
+    );
+    
+    const refreshToken = jwt.default.sign(
+      { id: user._id, role: user.role },
+      process.env.REFRESH_TOKEN_SECRET,
+      { expiresIn: "7d" }
+    );
+    
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+    
+    res.status(200).json({
+      accessToken,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { username, email, password, role } = req.body;
+    
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+    
+    // Import User model dynamically
+    const { default: User } = await import('./models/user.js');
+    const bcrypt = await import('bcryptjs');
+    
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+    
+    const hashedPassword = await bcrypt.default.hash(password, 10);
+    const user = new User({
+      username,
+      email,
+      password: hashedPassword,
+      role: role || 'user'
+    });
+    
+    await user.save();
+    
+    res.status(201).json({
+      message: 'User registered successfully',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error("Register error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.post('/api/auth/refresh', (req, res) => {
+  res.json({ message: 'Refresh endpoint working' });
+});
+
+// Original routes (commented out for testing)
+// app.use('/api/auth', authRoutes);
+// app.use('/api/users', userRoutes);
+// app.use('/api/tasks', taskRoutes);
+
+console.log('Inline auth routes loaded');
 
 // Start server
 app.listen(PORT, () => {
