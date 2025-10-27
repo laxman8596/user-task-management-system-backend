@@ -19,7 +19,7 @@ app.use(
       'https://user-system-frontend.vercel.app',
       'http://localhost:5173',
       'http://localhost:3000',
-      'https://user-task-management-system-frontend.onrender.com/',
+      'https://user-task-management-system-frontend.onrender.com',
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
