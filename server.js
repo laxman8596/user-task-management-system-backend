@@ -229,10 +229,10 @@ app.post('/api/auth/refresh', (req, res) => {
   res.json({ message: 'Refresh endpoint working' });
 });
 
-// Original routes (commented out for testing)
-// app.use('/api/auth', authRoutes);
-// app.use('/api/users', userRoutes);
-// app.use('/api/tasks', taskRoutes);
+// Original routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/tasks', taskRoutes);
 
 console.log('Inline auth routes loaded');
 
