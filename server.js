@@ -16,7 +16,6 @@ app.use(cookieParser());
 app.use(
   cors({
     origin: [
-      'https://user-system-frontend.vercel.app',
       'http://localhost:5173',
       'http://localhost:3000',
       'https://user-task-management-system-frontend.onrender.com',
